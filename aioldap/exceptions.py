@@ -26,3 +26,7 @@ class LDAPDeleteException(LDAPException):
 
 class LDAPAddException(LDAPException):
     pass
+
+
+class LDAPExtendedException(LDAPException):
+    pass

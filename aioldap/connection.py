@@ -4,7 +4,8 @@ import ssl
 from copy import deepcopy
 from typing import Union, AsyncGenerator, Dict, List, Optional, Any
 
-from aioldap.exceptions import LDAPBindException, LDAPStartTlsException, LDAPChangeException, LDAPModifyException, LDAPDeleteException, LDAPAddException
+from aioldap.exceptions import LDAPBindException, LDAPStartTlsException, LDAPChangeException, LDAPModifyException, \
+    LDAPDeleteException, LDAPAddException, LDAPExtendedException
 
 
 # LDAP3 includes
@@ -483,6 +484,18 @@ class LDAPConnection(object):
 
         if resp.data['result'] != 0:
             raise LDAPAddException('Failed to modify dn {0}. Msg {1} {2} {3}'.format(dn, resp.data['result'], resp.data.get('message'), resp.data.get('description')))
+
+    async def whoami(self):
+        resp = await self.extended('1.3.6.1.4.1.4203.1.11.3')
+
+        if resp.data['result'] != 0:
+            raise LDAPExtendedException('Failed to modify dn {0}. Msg {1} {2} {3}'.format(dn, resp.data['result'], resp.data.get('message'), resp.data.get('description')))
+
+        result = resp.data.get('responseValue')
+        if isinstance(result, bytes):
+            result = result.decode()
+
+        return result
 
     @property
     def is_bound(self) -> bool:
