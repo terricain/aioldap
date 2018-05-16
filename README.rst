@@ -22,10 +22,10 @@ aioldap
 
 Not entirely ready, literally just started. Might shuffle things around a bit etc...
 
-This was initially going to be a complete "from scratch" LDAP library for asyncio. Having used `ldap3` for quite a 
-while I thought, wouldnt it be nice to have something ldap3-like but using normal asyncio. So I wrote this library
-sort of around ldap3, it uses ldap3, encoding and decoding functions and then I just dealt with the actual packet
-handoff. And as for why I made this, well because I can...
+This was initially going to be a complete "from scratch" LDAP library for asyncio. Having used ldap3 for quite a
+while I thought: wouldn't it be nice to have something ldap3-like but using normal asyncio. So I wrote this library which
+is sort of based around ldap3, it uses ldap3's encoding and decoding functions and I just dealt with the actual packet
+handoff. As as for why I made this, well because I can... and because I was bored.
 
 I wouldn't quite call this production ready yet, and it could do with a bit of cleaning up but if anyone actually
 finds this library useful, raise an issue with anything you have and I'll be happy to help out.
