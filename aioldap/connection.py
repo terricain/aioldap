@@ -190,8 +190,9 @@ class LDAPClientProtocol(asyncio.Protocol):
             print()
 
     def connection_lost(self, exc):
-        # TODO log unbound
         logger.debug('Connection lost')
+        # TODO go through all self.responses, mark finished, also if not an unbind, do some sort of exception raise
+
         self._is_bound = False
         try:
             self.responses['unbind'].finished.set()
