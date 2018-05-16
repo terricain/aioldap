@@ -17,7 +17,7 @@ requirements = [
 
 setup(
     name='aioldap',
-    version='0.2.1',
+    version='0.2.2',
     description="Async ldap library sorta based off ldap3",
     long_description=readme + '\n\n' + history,
     author="Terry Cain",
