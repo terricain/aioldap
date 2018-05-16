@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import gc
 import socket
 import time
@@ -8,7 +7,6 @@ import uuid
 import ldap3
 import pytest
 import uvloop
-from attr import attributes
 from docker import APIClient
 
 
@@ -77,7 +75,6 @@ def pytest_runtest_setup(item):
     if 'run_loop' in item.keywords and 'loop' not in item.fixturenames:
         # inject an event loop fixture for all async tests
         item.fixturenames.append('loop')
-
 
 
 @pytest.fixture(scope='session')

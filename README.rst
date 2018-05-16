@@ -8,6 +8,10 @@ aioldap
 .. image:: https://img.shields.io/travis/terrycain/aioldap.svg
         :target: https://travis-ci.org/terrycain/aioldap
 
+.. image:: https://codecov.io/gh/terrycain/aioldap/branch/master/graph/badge.svg
+        :target: https://codecov.io/gh/terrycain/aioldap
+        :alt: Code coverage
+
 .. image:: https://readthedocs.org/projects/aioldap/badge/?version=latest
         :target: https://aioldap.readthedocs.io
         :alt: Documentation Status

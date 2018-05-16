@@ -1,4 +1,0 @@
-[run]
-branch = True
-source = aiomldap, tests
-omit = site-packages, .tox

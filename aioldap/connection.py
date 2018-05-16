@@ -3,7 +3,7 @@ import asyncio.sslproto
 import logging
 import ssl
 from copy import deepcopy
-from typing import Union, AsyncGenerator, Dict, List, Optional, Any
+from typing import Union, AsyncGenerator, Dict, List, Optional
 
 from aioldap.exceptions import LDAPBindException, LDAPStartTlsException, LDAPChangeException, LDAPModifyException, \
     LDAPDeleteException, LDAPAddException, LDAPExtendedException
@@ -72,7 +72,6 @@ class LDAPClientProtocol(asyncio.Protocol):
         self.transport.write(payload)
         logger.debug('Sent request id {0}'.format(msg_id))
         response.started.set()
-
 
         return response
 
@@ -336,7 +335,8 @@ class LDAPConnection(object):
 
             search_req = search_operation(
                 search_base, search_filter, search_scope, dereference_aliases, attributes, size_limit,
-                time_limit, types_only, auto_escape=auto_escape, auto_encode=auto_encode, schema=schema, validator=validator, check_names=check_names
+                time_limit, types_only, auto_escape=auto_escape, auto_encode=auto_encode,
+                schema=schema, validator=validator, check_names=check_names
             )
 
             msg_id = self._next_msg_id
@@ -385,7 +385,8 @@ class LDAPConnection(object):
 
     async def start_tls(self, host, ctx: Optional[ssl.SSLContext]=None, port: int=389):
         if self._proto is None or self._proto.transport.is_closing():
-            self._socket, self._proto = await self.loop.create_connection(lambda: LDAPClientProtocol(self.loop), host, port)  # TODO use a Server obj or something
+            # TODO use a Server obj or something
+            self._socket, self._proto = await self.loop.create_connection(lambda: LDAPClientProtocol(self.loop), host, port)
 
         if ctx is None:
             ctx = ssl.create_default_context()
@@ -440,7 +441,12 @@ class LDAPConnection(object):
         await resp.wait()
 
         if resp.data['result'] != 0:
-            raise LDAPModifyException('Failed to modify dn {0}. Msg {1} {2} {3}'.format(dn, resp.data['result'], resp.data.get('message'), resp.data.get('description')))
+            raise LDAPModifyException(
+                'Failed to modify dn {0}. Msg {1} {2} {3}'.format(dn,
+                                                                  resp.data['result'],
+                                                                  resp.data.get('message'),
+                                                                  resp.data.get('description'))
+            )
 
     async def delete(self, dn: str, controls=None, ignore_no_exist=False):
         """
@@ -458,11 +464,16 @@ class LDAPConnection(object):
         await resp.wait()
 
         if resp.data['result'] != 0 and not (ignore_no_exist and resp.data['result'] == 32):
-            raise LDAPDeleteException('Failed to modify dn {0}. Msg {1} {2} {3}'.format(dn, resp.data['result'], resp.data.get('message'), resp.data.get('description')))
+            raise LDAPDeleteException(
+                'Failed to modify dn {0}. Msg {1} {2} {3}'.format(dn,
+                                                                  resp.data['result'],
+                                                                  resp.data.get('message'),
+                                                                  resp.data.get('description'))
+            )
 
     async def add(self, dn: str, object_class: Optional[Union[List[str], str]]=None,
-                  attributes: Dict[str, Union[List[str],str]]=None, controls=None,
-                  auto_encode: bool=True,timeout: Optional[int]=None):
+                  attributes: Dict[str, Union[List[str], str]]=None, controls=None,
+                  auto_encode: bool=True, timeout: Optional[int]=None):
         """
         Add dn to the DIT, object_class is None, a class name or a list
         of class names.
@@ -500,9 +511,9 @@ class LDAPConnection(object):
         if not object_class_attr_name:
             object_class_attr_name = 'objectClass'
 
-        # So now we have attr_object_class, which contains any passed in object classes and any we've found in attributes
-
-        attr_object_class = list(set([to_unicode(object_class) for object_class in attr_object_class]))  # converts objectclass to unicode in case of bytes value, also removes dupes
+        # So now we have attr_object_class, which contains any passed in object classes and any we've found in attributes.
+        # Converts objectclass to unicode in case of bytes value, also removes dupes
+        attr_object_class = list(set([to_unicode(object_class) for object_class in attr_object_class]))
         _attributes[object_class_attr_name] = attr_object_class
 
         add_request = add_operation(dn, _attributes, auto_encode, None, validator=None, check_names=False)
@@ -519,13 +530,22 @@ class LDAPConnection(object):
             await resp.wait()
 
         if resp.data['result'] != 0:
-            raise LDAPAddException('Failed to modify dn {0}. Msg {1} {2} {3}'.format(dn, resp.data['result'], resp.data.get('message'), resp.data.get('description')))
+            raise LDAPAddException(
+                'Failed to modify dn {0}. Msg {1} {2} {3}'.format(dn,
+                                                                  resp.data['result'],
+                                                                  resp.data.get('message'),
+                                                                  resp.data.get('description'))
+            )
 
     async def whoami(self):
         resp = await self.extended('1.3.6.1.4.1.4203.1.11.3')
 
         if resp.data['result'] != 0:
-            raise LDAPExtendedException('Failed to perform extended query. Msg {0} {1} {2}'.format(resp.data['result'], resp.data.get('message'), resp.data.get('description')))
+            raise LDAPExtendedException(
+                'Failed to perform extended query. Msg {0} {1} {2}'.format(resp.data['result'],
+                                                                           resp.data.get('message'),
+                                                                           resp.data.get('description'))
+            )
 
         result = resp.data.get('responseValue')
         if isinstance(result, bytes):
