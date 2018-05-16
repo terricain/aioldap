@@ -1,6 +1,8 @@
 import asyncio
 import gc
+import os
 import socket
+import ssl
 import time
 import uuid
 
@@ -15,6 +17,8 @@ def pytest_generate_tests(metafunc):
         loop_type = ['asyncio', 'uvloop'] if uvloop else ['asyncio']
         metafunc.parametrize("loop_type", loop_type)
 
+    if 'tls_enabled' in metafunc.fixturenames:
+        metafunc.parametrize("tls_enabled", ['plain', 'tls'])
 
 # Copied most from aiopg
 @pytest.fixture(scope='session')
@@ -90,61 +94,80 @@ def session_id():
 
 @pytest.fixture(scope='session')
 def ldap_server(unused_port, docker, request):
-    docker.pull('jtgasper3/389ds-basic:latest:latest')
+    docker.pull('minkwe/389ds:latest')
 
-    # container_args = dict(
-    #     image='osixia/openldap:1.2.1',
-    #     name='aioldap-test-server-{0}'.format(session_id()),
-    #     ports=[389],
-    #     detach=True,
-    # )
-    container_args = dict(
-        image='jtgasper3/389ds-basic:latest',
-        name='aioldap-test-server-{0}'.format(session_id()),
-        ports=[389],
-        detach=True,
-    )
+    ssl_directory = os.path.join(os.path.dirname(__file__), 'resources', 'ssl')
+    ca_file = os.path.join(ssl_directory, 'ca.pem')
 
-    # bound IPs do not work on OSX
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+    ctx.check_hostname = False
+    ctx.load_verify_locations(cafile=ca_file)
+
     host = "127.0.0.1"
     host_port = unused_port()
-    container_args['host_config'] = docker.create_host_config(port_bindings={389: (host, host_port)})
+    server_params = {
+        'host': host, 'port': host_port, 'base_dn': 'dc=example,dc=com',
+        'user': 'cn=Directory Manager', 'password': 'password',
+        'test_ou1': 'ou=test1,dc=example,dc=com',
+        'test_ou2': 'ou=test2,dc=example,dc=com',
+        'test_ou3': 'ou=test3,dc=example,dc=com',
+        'whoami': 'dn: cn=directory manager',
+        'ctx': ctx
+    }
+
+    container_args = {
+        'image': 'minkwe/389ds:latest',
+        'name': 'aioldap-test-server-{0}'.format(session_id()),
+        'ports': [389],
+        'detach': True,
+        'hostname': 'ldap.example.com',
+        'environment': {
+            'DIR_HOSTNAME': 'ldap.example.com',
+            'DIR_MANAGER_PASSWORD': server_params['password'],
+            'DIR_SUFFIX': server_params['base_dn']
+        },
+        'host_config': docker.create_host_config(
+            port_bindings={389: (host, host_port)},
+            binds={
+               ssl_directory: {'bind': '/certs', 'ro': False},
+            }
+        ),
+        'volumes': ['/certs']
+    }
+
     container = docker.create_container(**container_args)
 
     try:
         docker.start(container=container['Id'])
-        server_params = {
-            'host': host, 'port': host_port, 'base_dn': 'dc=example,dc=edu',
-            'user': 'cn=Directory Manager', 'password': 'password',
-            'test_ou1': 'ou=test1,dc=example,dc=edu',
-            'test_ou2': 'ou=test2,dc=example,dc=edu',
-            'test_ou3': 'ou=test3,dc=example,dc=edu',
-            'whoami': 'dn: cn=directory manager'
-        }
         delay = 0.001
+
+        # 389 takes at least 15 to come up, go down, come up with SSL
+        time.sleep(15)
 
         for i in range(100):
             try:
                 server = ldap3.Server(host=host, port=host_port, get_info=None)
-                conn = ldap3.Connection(server, user='cn=Directory Manager', password='password')
+                conn = ldap3.Connection(server, user='cn=Directory Manager', password=server_params['password'])
                 conn.bind()
 
-                assert conn.extend.standard.who_am_i() == 'dn: cn=directory manager', "Unexpected bind user"
-
-                res = conn.search('dc=example,dc=edu', '(cn=*)')
+                whoami = conn.extend.standard.who_am_i()
+                assert whoami == 'dn: cn=directory manager', "Unexpected bind user"
 
                 # Create an OU to throw some stuff
-                res = conn.add('ou=test1,dc=example,dc=edu', object_class='organizationalUnit')
-                assert res, "Failed to create ou=test1,dc=example,dc=edu"
-                res = conn.add('ou=test2,dc=example,dc=edu', object_class='organizationalUnit')
-                assert res, "Failed to create ou=test2,dc=example,dc=edu"
-                res = conn.add('ou=test3,dc=example,dc=edu', object_class='organizationalUnit')
-                assert res, "Failed to create ou=test3,dc=example,dc=edu"
+                res = conn.add(server_params['test_ou1'], object_class='organizationalUnit')
+                assert res, "Failed to create ou=test1"
+                res = conn.add(server_params['test_ou2'], object_class='organizationalUnit')
+                assert res, "Failed to create ou=test2"
+                res = conn.add(server_params['test_ou3'], object_class='organizationalUnit')
+                assert res, "Failed to create ou=test3"
 
                 break
             except AssertionError as err:
                 pytest.fail(str(err))
             except Exception as err:
+                if delay > 40:
+                    pytest.fail('container startup took too long')
+
                 time.sleep(delay)
                 delay *= 2
         else:
@@ -161,7 +184,7 @@ def ldap_server(unused_port, docker, request):
 
 
 @pytest.fixture
-def ldap_params(ldap_server):
+def ldap_params(ldap_server, tls_enabled):
     return dict(**ldap_server['ldap_params'])
 
 
