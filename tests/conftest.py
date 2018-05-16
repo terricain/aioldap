@@ -7,7 +7,15 @@ import uuid
 
 import ldap3
 import pytest
+import uvloop
+from attr import attributes
 from docker import APIClient
+
+
+def pytest_generate_tests(metafunc):
+    if 'loop_type' in metafunc.fixturenames:
+        loop_type = ['asyncio', 'uvloop'] if uvloop else ['asyncio']
+        metafunc.parametrize("loop_type", loop_type)
 
 
 # Copied most from aiopg
@@ -19,10 +27,16 @@ def unused_port():
             return s.getsockname()[1]
     return f
 
-@pytest.fixture
-def loop(request):
+
+@pytest.yield_fixture
+def loop(request, loop_type):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(None)
+
+    if uvloop and loop_type == 'uvloop':
+        loop = uvloop.new_event_loop()
+    else:
+        loop = asyncio.new_event_loop()
 
     yield loop
 
@@ -36,27 +50,12 @@ def loop(request):
 
 @pytest.mark.tryfirst
 def pytest_pycollect_makeitem(collector, name, obj):
-    if collector.funcnamefilter(name) and asyncio.iscoroutinefunction(obj):
-        return list(collector._genfunctions(name, obj))
-
-
-@contextlib.contextmanager
-def _passthrough_loop_context(loop):
-    if loop:
-        # loop already exists, pass it straight through
-        yield loop
-    else:
-        # this shadows loop_context's standard behavior
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(None)
-        yield loop
-        closed = loop.is_closed()
-        if not closed:
-            loop.call_soon(loop.stop)
-            loop.run_forever()
-            loop.close()
-            gc.collect()
-        asyncio.set_event_loop(None)
+    if collector.funcnamefilter(name):
+        if not callable(obj):
+            return
+        item = pytest.Function(name, parent=collector)
+        if 'run_loop' in item.keywords:
+            return list(collector._genfunctions(name, obj))
 
 
 @pytest.mark.tryfirst
@@ -65,16 +64,20 @@ def pytest_pyfunc_call(pyfuncitem):
     Run asyncio marked test functions in an event loop instead of a normal
     function call.
     """
-    if asyncio.iscoroutinefunction(pyfuncitem.function):
-        existing_loop = pyfuncitem.funcargs.get('loop', None)
-        with _passthrough_loop_context(existing_loop) as _loop:
-            testargs = {arg: pyfuncitem.funcargs[arg]
-                        for arg in pyfuncitem._fixtureinfo.argnames}
-
-            task = _loop.create_task(pyfuncitem.obj(**testargs))
-            _loop.run_until_complete(task)
-
+    if 'run_loop' in pyfuncitem.keywords:
+        funcargs = pyfuncitem.funcargs
+        loop = funcargs['loop']
+        testargs = {arg: funcargs[arg]
+                    for arg in pyfuncitem._fixtureinfo.argnames}
+        loop.run_until_complete(pyfuncitem.obj(**testargs))
         return True
+
+
+def pytest_runtest_setup(item):
+    if 'run_loop' in item.keywords and 'loop' not in item.fixturenames:
+        # inject an event loop fixture for all async tests
+        item.fixturenames.append('loop')
+
 
 
 @pytest.fixture(scope='session')
@@ -90,10 +93,16 @@ def session_id():
 
 @pytest.fixture(scope='session')
 def ldap_server(unused_port, docker, request):
-    docker.pull('osixia/openldap:1.2.1')
+    docker.pull('jtgasper3/389ds-basic:latest:latest')
 
+    # container_args = dict(
+    #     image='osixia/openldap:1.2.1',
+    #     name='aioldap-test-server-{0}'.format(session_id()),
+    #     ports=[389],
+    #     detach=True,
+    # )
     container_args = dict(
-        image='osixia/openldap:1.2.1',
+        image='jtgasper3/389ds-basic:latest',
         name='aioldap-test-server-{0}'.format(session_id()),
         ports=[389],
         detach=True,
@@ -108,24 +117,32 @@ def ldap_server(unused_port, docker, request):
     try:
         docker.start(container=container['Id'])
         server_params = {
-            'host': host, 'port': host_port, 'base_dn': 'dc=example,dc=org',
-            'user': 'cn=admin,dc=example,dc=org', 'password': 'admin',
-            'test_ou1': 'ou=test1,dc=example,dc=org',
-            'test_ou2': 'ou=test2,dc=example,dc=org',
+            'host': host, 'port': host_port, 'base_dn': 'dc=example,dc=edu',
+            'user': 'cn=Directory Manager', 'password': 'password',
+            'test_ou1': 'ou=test1,dc=example,dc=edu',
+            'test_ou2': 'ou=test2,dc=example,dc=edu',
+            'test_ou3': 'ou=test3,dc=example,dc=edu',
+            'whoami': 'dn: cn=directory manager'
         }
         delay = 0.001
 
         for i in range(100):
             try:
                 server = ldap3.Server(host=host, port=host_port, get_info=None)
-                conn = ldap3.Connection(server, user='cn=admin,dc=example,dc=org', password='admin')
+                conn = ldap3.Connection(server, user='cn=Directory Manager', password='password')
                 conn.bind()
 
-                assert conn.extend.standard.who_am_i() == 'dn:cn=admin,dc=example,dc=org', "Unexpected bind user"
+                assert conn.extend.standard.who_am_i() == 'dn: cn=directory manager', "Unexpected bind user"
+
+                res = conn.search('dc=example,dc=edu', '(cn=*)')
 
                 # Create an OU to throw some stuff
-                res = conn.add('ou=test1,dc=example,dc=org', object_class='organizationalUnit')
-                assert res, "Failed to create ou=test1,dc=example,dc=org"
+                res = conn.add('ou=test1,dc=example,dc=edu', object_class='organizationalUnit')
+                assert res, "Failed to create ou=test1,dc=example,dc=edu"
+                res = conn.add('ou=test2,dc=example,dc=edu', object_class='organizationalUnit')
+                assert res, "Failed to create ou=test2,dc=example,dc=edu"
+                res = conn.add('ou=test3,dc=example,dc=edu', object_class='organizationalUnit')
+                assert res, "Failed to create ou=test3,dc=example,dc=edu"
 
                 break
             except AssertionError as err:
@@ -152,25 +169,7 @@ def ldap_params(ldap_server):
 
 
 @pytest.fixture
-def make_connection(loop, pg_params):
-
-    conns = []
-
-    @asyncio.coroutine
-    def go(*, no_loop=False, **kwargs):
-        nonlocal conn
-        params = pg_params.copy()
-        params.update(kwargs)
-        useloop = None if no_loop else loop
-        conn = yield from aiopg.connect(loop=useloop, **params)
-        conn2 = yield from aiopg.connect(loop=useloop, **params)
-        cur = yield from conn2.cursor()
-        yield from cur.execute("DROP TABLE IF EXISTS foo")
-        yield from conn2.close()
-        conns.append(conn)
-        return conn
-
-    yield go
-
-    for conn in conns:
-        loop.run_until_complete(conn.close())
+def user_entry():
+    def _f(test_name, ou_dn):
+        return 'uid=test_{0}_{1},{2}'.format(test_name, str(uuid.uuid4()), ou_dn)
+    return _f
