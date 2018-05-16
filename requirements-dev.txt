@@ -4,3 +4,4 @@ uvloop==0.9.1
 async-timeout==3.0.0
 flake8==3.5.0
 pytest-cov==2.5.1
+bumpversion==0.5.3
