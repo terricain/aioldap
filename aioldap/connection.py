@@ -30,6 +30,16 @@ from ldap3.utils.conv import to_unicode
 logger = logging.getLogger('aioldap')
 
 
+class Server(object):
+    def __init__(self, host: str, port: int=None, use_ssl: bool=False, ssl_context: Optional[ssl.SSLContext]=None):
+        self.host = host
+        self.port = port
+        if port is None:
+            self.port = 636 if use_ssl else 389
+        self.use_ssl = use_ssl
+        self.ssl_ctx = ssl_context if ssl_context else ssl.create_default_context()
+
+
 class LDAPResponse(object):
     def __init__(self, loop, onfinish=None):
         self._onfinish = onfinish
@@ -243,7 +253,8 @@ class LDAPClientProtocol(asyncio.Protocol):
 
 
 class LDAPConnection(object):
-    def __init__(self, loop: asyncio.AbstractEventLoop=None):
+    def __init__(self, server: Server, user: str=None, password: str=None, loop: asyncio.AbstractEventLoop=None):
+        # TODO add option for wait timeout
         self._responses = {}
         self._msg_id = 0
         self._proto = None  # type: LDAPClientProtocol
@@ -252,12 +263,16 @@ class LDAPConnection(object):
         if self.loop is None:
             self.loop = asyncio.get_event_loop()
 
+        self.server = server
+        self.bind_dn = user
+        self.bind_pw = password
+
     @property
     def _next_msg_id(self) -> int:
         self._msg_id += 1
         return self._msg_id
 
-    async def bind(self, bind_dn: str, bind_pw: str, host: str, port: int=389):
+    async def bind(self, bind_dn: str=None, bind_pw: str=None):
         """
         Bind to LDAP server
 
@@ -271,7 +286,11 @@ class LDAPConnection(object):
         """
         # Create proto if its not created already
         if self._proto is None or self._proto.transport.is_closing():
-            self._socket, self._proto = await self.loop.create_connection(lambda: LDAPClientProtocol(self.loop), host, port)
+            self._socket, self._proto = await self.loop.create_connection(lambda: LDAPClientProtocol(self.loop), self.server.host, self.server.port)
+
+        # TODO check if already bound
+        # TODO if bind_dn is empty, and self.bind_dn is empty, do unauthenticated bind
+        raise RuntimeError()
 
         # Create bind packet
         bind_req = BindRequest()
@@ -383,13 +402,12 @@ class LDAPConnection(object):
         if self._proto.transport is None or self._proto.transport.is_closing():
             self._proto = None
 
-    async def start_tls(self, host, ctx: Optional[ssl.SSLContext]=None, port: int=389):
+    async def start_tls(self, ctx: Optional[ssl.SSLContext]=None):
         if self._proto is None or self._proto.transport.is_closing():
-            # TODO use a Server obj or something
-            self._socket, self._proto = await self.loop.create_connection(lambda: LDAPClientProtocol(self.loop), host, port)
+            self._socket, self._proto = await self.loop.create_connection(lambda: LDAPClientProtocol(self.loop), self.server.host, self.server.port)
 
-        if ctx is None:
-            ctx = ssl.create_default_context()
+        # Get SSL context from server obj, if it wasnt provided, it'll be the default one
+        ctx = ctx if ctx else self.server.ssl_ctx
 
         resp = await self.extended('1.3.6.1.4.1.1466.20037')
 
