@@ -100,7 +100,8 @@ async def test_add(ldap_connection, ldap_params, tls_enabled, loop, user_entry):
     )
 
     # Now search for user
-    async for user in conn.search(dn, search_filter='(uid=*)', search_scope='BASE', attributes='*'):
+    result = await conn.search(dn, search_filter='(uid=*)', search_scope='BASE', attributes='*')
+    for user in result['entries']:
         assert user['dn'] == dn
         assert user['attributes'].get('cn')[0] == 'some_user'
         assert user['attributes'].get('sn')[0] == 'some user'
@@ -184,7 +185,8 @@ async def test_modify(ldap_connection, ldap_params, tls_enabled, loop, user_entr
     )
 
     # Now search for user
-    async for user in conn.search(dn, search_filter='(uid=*)', search_scope='BASE', attributes='*'):
+    result = await conn.search(dn, search_filter='(uid=*)', search_scope='BASE', attributes='*')
+    for user in result['entries']:
         assert user['dn'] == dn
         assert len(user['attributes'].get('sn')) == 1
         assert user['attributes'].get('sn')[0] == 'some other user'
@@ -205,6 +207,7 @@ async def test_paged_search(ldap_connection, ldap_params, tls_enabled, loop, use
       modify_add works
       modify_replace works
     """
+    # import logging
     # logger = logging.getLogger('aioldap')
     # if not logger.handlers:
     #     logger.addHandler(logging.StreamHandler())
@@ -227,8 +230,9 @@ async def test_paged_search(ldap_connection, ldap_params, tls_enabled, loop, use
             timeout=10
         )
 
-    user_list = [user['dn'] async for user in conn.search(ldap_params['test_ou2'], '(uid=*)', timeout=10)]
-    user_list2 = [user['dn'] async for user in conn.search(ldap_params['test_ou2'], '(uid=*)', paged=True, paged_size=50, timeout=10)]
+    result = await conn.search(ldap_params['test_ou2'], '(uid=*)', timeout=10)
+    user_list = [user['dn'] for user in result['entries']]
+    user_list2 = [user['dn'] async for user in conn.paged_search(ldap_params['test_ou2'], '(uid=*)', page_size=50, timeout=10)]
 
     assert set(user_list) == set(user_list2), "Search != Paged Search"
 
@@ -261,7 +265,8 @@ async def test_mass_add(ldap_connection, ldap_params, loop, user_entry):
 
     await asyncio.gather(*coro_list)
 
-    user_list = [user['dn'] async for user in conn.search(ldap_params['test_ou3'], '(uid=*)')]
+    result = await conn.search(ldap_params['test_ou3'], '(uid=*)')
+    user_list = [user['dn'] for user in result['entries']]
 
     # Basically as uvloop test then adds more users we should just check we've found the ones we've added this time
     # Really we should make an OU for the test

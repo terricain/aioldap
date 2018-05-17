@@ -3,7 +3,7 @@ import asyncio.sslproto
 import logging
 import ssl
 from copy import deepcopy
-from typing import Union, AsyncGenerator, Dict, List, Optional
+from typing import Union, AsyncGenerator, Dict, List, Optional, Any
 
 from aioldap.exceptions import LDAPBindException, LDAPStartTlsException, LDAPChangeException, LDAPModifyException, \
     LDAPDeleteException, LDAPAddException, LDAPExtendedException
@@ -333,9 +333,9 @@ class LDAPConnection(object):
 
     async def search(self, search_base: str, search_filter: str, search_scope: str='SUBTREE', dereference_aliases: str='ALWAYS',
                      attributes: Optional[Union[str, List[str]]]=None, size_limit: int=0, time_limit: int=0, types_only: bool=False,
-                     auto_escape: bool=True, auto_encode: bool=True, schema=None, validator=None, check_names: bool=False,
+                     auto_escape: bool=True, auto_encode: bool=True, schema=None, validator=None, check_names: bool=False, cookie=None,
                      timeout: Optional[int]=None, get_operational_attributes: bool=False,
-                     paged=False, paged_size=500) -> AsyncGenerator[List[dict], None]:
+                     page_size=0) -> Dict[str, Any]:
         if not self.is_bound:
             raise LDAPBindException('Must be bound')
 
@@ -353,45 +353,66 @@ class LDAPConnection(object):
         elif get_operational_attributes and isinstance(attributes, tuple):
             attributes += ('+',)
 
+        controls = []
+        if page_size:
+            controls.append(paged_search_control(False, page_size, cookie))
+        if not controls:
+            controls = None
+
+        search_req = search_operation(
+            search_base, search_filter, search_scope, dereference_aliases, attributes, size_limit,
+            time_limit, types_only, auto_escape=auto_escape, auto_encode=auto_encode,
+            schema=schema, validator=validator, check_names=check_names
+        )
+
+        msg_id = self._next_msg_id
+
+        ldap_msg = LDAPClientProtocol.encapsulate_ldap_message(msg_id, 'searchRequest', search_req, controls=controls)
+
+        resp = self._proto.send(ldap_msg)
+
+        if timeout:
+            with async_timeout(timeout):
+                await resp.wait()
+        else:
+            await resp.wait()
+
+        try:
+            cookie = resp.additional['controls']['1.2.840.113556.1.4.319']['value']['cookie']
+        except KeyError:
+            cookie = None
+
+        if not isinstance(resp.data, list):
+            data = []
+        else:
+            data = resp.data
+
+        return {
+            'entries': data,
+            'cookie': cookie
+        }
+
+    async def paged_search(self, search_base: str, search_filter: str, search_scope: str='SUBTREE', dereference_aliases: str='ALWAYS',
+                     attributes: Optional[Union[str, List[str]]]=None, size_limit: int=0, time_limit: int=0, types_only: bool=False,
+                     auto_escape: bool=True, auto_encode: bool=True, schema=None, validator=None, check_names: bool=False,
+                     timeout: Optional[int]=None, get_operational_attributes: bool=False,
+                     page_size=500) -> AsyncGenerator[dict, None]:
+        if not self.is_bound:
+            raise LDAPBindException('Must be bound')
+
         cookie = True  # True so loop runs once
         while cookie is not None and cookie != b'':
-            controls = []
-            # If paged, add some controls
-            if paged:
-                # Page criticality = False, page_size
-                cookie = None if cookie is True else cookie
-                controls.append(paged_search_control(False, paged_size, cookie))
-            if not controls:
-                controls = None
-
-            search_req = search_operation(
-                search_base, search_filter, search_scope, dereference_aliases, attributes, size_limit,
-                time_limit, types_only, auto_escape=auto_escape, auto_encode=auto_encode,
-                schema=schema, validator=validator, check_names=check_names
+            response = await self.search(
+                search_base, search_filter, search_scope=search_scope, dereference_aliases=dereference_aliases,
+                attributes=attributes, size_limit=size_limit, time_limit=time_limit, types_only=types_only,
+                auto_escape=auto_escape, auto_encode=auto_encode, schema=schema, validator=validator, check_names=check_names,
+                timeout=timeout, get_operational_attributes=get_operational_attributes, page_size=page_size, cookie=None if cookie is True else cookie
             )
 
-            msg_id = self._next_msg_id
+            while response['entries']:
+                yield response['entries'].pop()
 
-            ldap_msg = LDAPClientProtocol.encapsulate_ldap_message(msg_id, 'searchRequest', search_req, controls=controls)
-
-            resp = self._proto.send(ldap_msg)
-
-            if timeout:
-                with async_timeout(timeout):
-                    await resp.wait()
-            else:
-                await resp.wait()
-
-            if not isinstance(resp.data, list):
-                pass
-            else:
-                while resp.data:
-                    yield resp.data.pop()
-
-            try:
-                cookie = resp.additional['controls']['1.2.840.113556.1.4.319']['value']['cookie']
-            except KeyError:
-                cookie = None
+            cookie = response['cookie']
 
     async def unbind(self):
         if not self.is_bound:
