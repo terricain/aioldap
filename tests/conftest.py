@@ -11,6 +11,8 @@ import pytest
 import uvloop
 from docker import APIClient
 
+import aioldap
+
 
 def pytest_generate_tests(metafunc):
     if 'loop_type' in metafunc.fixturenames:
@@ -19,6 +21,7 @@ def pytest_generate_tests(metafunc):
 
     if 'tls_enabled' in metafunc.fixturenames:
         metafunc.parametrize("tls_enabled", ['plain', 'tls'])
+
 
 # Copied most from aiopg
 @pytest.fixture(scope='session')
@@ -184,7 +187,7 @@ def ldap_server(unused_port, docker, request):
 
 
 @pytest.fixture
-def ldap_params(ldap_server, tls_enabled):
+def ldap_params(ldap_server):
     return dict(**ldap_server['ldap_params'])
 
 
@@ -192,4 +195,22 @@ def ldap_params(ldap_server, tls_enabled):
 def user_entry():
     def _f(test_name, ou_dn):
         return 'uid=test_{0}_{1},{2}'.format(test_name, str(uuid.uuid4()), ou_dn)
+    return _f
+
+
+@pytest.fixture
+def ldap_connection(ldap_params):
+    def _f() -> aioldap.LDAPConnection:
+        server = aioldap.Server(
+            host=ldap_params['host'],
+            port=ldap_params['port'],
+            ssl_context=ldap_params['ctx']
+        )
+        conn = aioldap.LDAPConnection(
+            server=server,
+            user=ldap_params['user'],
+            password=ldap_params['password']
+        )
+        return conn
+
     return _f

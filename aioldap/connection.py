@@ -47,11 +47,16 @@ class LDAPResponse(object):
         self.finished = asyncio.Event(loop=loop)
         self.data = None
         self.additional = {}
+        self.exception = None
 
     async def wait(self):
         await self.finished.wait()
-        if callable(self._onfinish):
-            self._onfinish()
+        try:
+            if callable(self._onfinish):
+                self._onfinish()
+        finally:
+            if self.exception:
+                raise self.exception
 
 
 class LDAPClientProtocol(asyncio.Protocol):
@@ -200,13 +205,12 @@ class LDAPClientProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         logger.debug('Connection lost')
-        # TODO go through all self.responses, mark finished, also if not an unbind, do some sort of exception raise
 
         self._is_bound = False
-        try:
-            self.responses['unbind'].finished.set()
-        except KeyError:
-            pass
+        for key, response in self.responses.items():
+            if key != 'unbind':
+                response.exception = ConnectionResetError('LDAP Server dropped the connection')
+            response.finished.set()
 
         if self._original_transport is not None:
             self._original_transport.close()
@@ -288,9 +292,17 @@ class LDAPConnection(object):
         if self._proto is None or self._proto.transport.is_closing():
             self._socket, self._proto = await self.loop.create_connection(lambda: LDAPClientProtocol(self.loop), self.server.host, self.server.port)
 
+        if not bind_dn:
+            bind_dn = self.bind_dn
+        if not bind_pw:
+            bind_pw = self.bind_pw
+
+        # If bind_dn is still None or '' then set up for anon bind
+        if not bind_dn:
+            bind_dn = ''
+            bind_pw = ''
+
         # TODO check if already bound
-        # TODO if bind_dn is empty, and self.bind_dn is empty, do unauthenticated bind
-        raise RuntimeError()
 
         # Create bind packet
         bind_req = BindRequest()

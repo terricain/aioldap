@@ -7,7 +7,7 @@ import aioldap.exceptions
 
 
 @pytest.mark.run_loop
-async def test_connect(ldap_params, loop):
+async def test_connect(ldap_connection, ldap_params, tls_enabled, loop):
     """
     This tests that:
       connections actually work
@@ -15,33 +15,46 @@ async def test_connect(ldap_params, loop):
       and that the extended whoami request works
     """
 
-    conn = aioldap.LDAPConnection(loop=loop)
-    await conn.bind(
-        bind_dn=ldap_params['user'],
-        bind_pw=ldap_params['password'],
-        host=ldap_params['host'],
-        port=ldap_params['port']
-    )
+    conn = ldap_connection()
+    if tls_enabled == 'tls':
+        await conn.start_tls()
+
+    await conn.bind()
+
+    await conn.unbind()
+
+
+@pytest.mark.run_loop
+async def test_whoami(ldap_connection, ldap_params, tls_enabled, loop):
+    """
+    This tests that:
+      connections actually work
+      extended requests somewhat work
+      and that the extended whoami request works
+    """
+
+    conn = ldap_connection()
+    if tls_enabled == 'tls':
+        await conn.start_tls()
+
+    await conn.bind()
 
     result = await conn.whoami()
     assert result == ldap_params['whoami'], "Not returning the correct binded user"
 
 
 @pytest.mark.run_loop
-async def test_add(ldap_params, loop, user_entry):
+async def test_add(ldap_connection, ldap_params, tls_enabled, loop, user_entry):
     """
     This tests that:
       add works
       search base works
     """
 
-    conn = aioldap.LDAPConnection()
-    await conn.bind(
-        bind_dn=ldap_params['user'],
-        bind_pw=ldap_params['password'],
-        host=ldap_params['host'],
-        port=ldap_params['port']
-    )
+    conn = ldap_connection()
+    if tls_enabled == 'tls':
+        await conn.start_tls()
+    await conn.bind()
 
     dn = user_entry('add', ldap_params['test_ou1'])
     await conn.add(
@@ -66,7 +79,7 @@ async def test_add(ldap_params, loop, user_entry):
 
 
 @pytest.mark.run_loop
-async def test_delete(ldap_params, loop, user_entry):
+async def test_delete(ldap_connection, ldap_params, tls_enabled, loop, user_entry):
     """
     This tests that:
       delete works
@@ -74,13 +87,10 @@ async def test_delete(ldap_params, loop, user_entry):
       delete error suppress
     """
 
-    conn = aioldap.LDAPConnection()
-    await conn.bind(
-        bind_dn=ldap_params['user'],
-        bind_pw=ldap_params['password'],
-        host=ldap_params['host'],
-        port=ldap_params['port']
-    )
+    conn = ldap_connection()
+    if tls_enabled == 'tls':
+        await conn.start_tls()
+    await conn.bind()
 
     dn = user_entry('delete', ldap_params['test_ou1'])
     await conn.add(
@@ -106,20 +116,17 @@ async def test_delete(ldap_params, loop, user_entry):
 
 
 @pytest.mark.run_loop
-async def test_modify(ldap_params, loop, user_entry):
+async def test_modify(ldap_connection, ldap_params, tls_enabled, loop, user_entry):
     """
     This tests that:
       modify_add works
       modify_replace works
     """
 
-    conn = aioldap.LDAPConnection()
-    await conn.bind(
-        bind_dn=ldap_params['user'],
-        bind_pw=ldap_params['password'],
-        host=ldap_params['host'],
-        port=ldap_params['port']
-    )
+    conn = ldap_connection()
+    if tls_enabled == 'tls':
+        await conn.start_tls()
+    await conn.bind()
 
     dn = user_entry('modify', ldap_params['test_ou1'])
     await conn.add(
@@ -160,7 +167,7 @@ async def test_modify(ldap_params, loop, user_entry):
 
 
 @pytest.mark.run_loop
-async def test_paged_search(ldap_params, loop, user_entry, caplog):
+async def test_paged_search(ldap_connection, ldap_params, tls_enabled, loop, user_entry):
     """
     This tests that:
       modify_add works
@@ -171,15 +178,12 @@ async def test_paged_search(ldap_params, loop, user_entry, caplog):
     #     logger.addHandler(logging.StreamHandler())
     # caplog.set_level(logging.DEBUG, logger='aioldap')
 
-    conn = aioldap.LDAPConnection()
-    await conn.bind(
-        bind_dn=ldap_params['user'],
-        bind_pw=ldap_params['password'],
-        host=ldap_params['host'],
-        port=ldap_params['port']
-    )
+    conn = ldap_connection()
+    if tls_enabled == 'tls':
+        await conn.start_tls()
+    await conn.bind()
 
-    for _ in range(0, 100):
+    for _ in range(0, 50):
         await conn.add(
             dn=user_entry('paged_search', ldap_params['test_ou2']),
             object_class='inetOrgPerson',
@@ -198,20 +202,15 @@ async def test_paged_search(ldap_params, loop, user_entry, caplog):
 
 
 @pytest.mark.run_loop
-async def test_mass_add(ldap_params, loop, user_entry):
+async def test_mass_add(ldap_connection, ldap_params, loop, user_entry):
     """
     This tests that:
       modify_add works
       modify_replace works
     """
 
-    conn = aioldap.LDAPConnection()
-    await conn.bind(
-        bind_dn=ldap_params['user'],
-        bind_pw=ldap_params['password'],
-        host=ldap_params['host'],
-        port=ldap_params['port']
-    )
+    conn = ldap_connection()
+    await conn.bind()
 
     coro_list = []
     dn_list = set()
