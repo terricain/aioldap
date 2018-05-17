@@ -393,10 +393,10 @@ class LDAPConnection(object):
         }
 
     async def paged_search(self, search_base: str, search_filter: str, search_scope: str='SUBTREE', dereference_aliases: str='ALWAYS',
-                     attributes: Optional[Union[str, List[str]]]=None, size_limit: int=0, time_limit: int=0, types_only: bool=False,
-                     auto_escape: bool=True, auto_encode: bool=True, schema=None, validator=None, check_names: bool=False,
-                     timeout: Optional[int]=None, get_operational_attributes: bool=False,
-                     page_size=500) -> AsyncGenerator[dict, None]:
+                           attributes: Optional[Union[str, List[str]]]=None, size_limit: int=0, time_limit: int=0, types_only: bool=False,
+                           auto_escape: bool=True, auto_encode: bool=True, schema=None, validator=None, check_names: bool=False,
+                           timeout: Optional[int]=None, get_operational_attributes: bool=False,
+                           page_size=500) -> AsyncGenerator[dict, None]:
         if not self.is_bound:
             raise LDAPBindException('Must be bound')
 
