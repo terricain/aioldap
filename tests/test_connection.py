@@ -44,6 +44,38 @@ async def test_whoami(ldap_connection, ldap_params, tls_enabled, loop):
 
 
 @pytest.mark.run_loop
+async def test_anonymous(ldap_connection, ldap_params, loop):
+    """
+    This tests that:
+      connections actually work
+      extended requests somewhat work
+      and that the extended whoami request works
+    """
+
+    conn = ldap_connection()
+
+    await conn.bind(bind_dn='', bind_pw='')
+
+    result = await conn.whoami()
+    assert result == '', "Not returning the correct binded user"
+
+
+@pytest.mark.run_loop
+async def test_bad_bind_creds(ldap_connection, ldap_params, loop):
+    """
+    This tests that:
+      connections actually work
+      extended requests somewhat work
+      and that the extended whoami request works
+    """
+
+    conn = ldap_connection()
+
+    with pytest.raises(aioldap.exceptions.LDAPBindException):
+        await conn.bind(bind_dn='cn=LOL', bind_pw='Invalid')
+
+
+@pytest.mark.run_loop
 async def test_add(ldap_connection, ldap_params, tls_enabled, loop, user_entry):
     """
     This tests that:

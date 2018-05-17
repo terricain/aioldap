@@ -292,9 +292,9 @@ class LDAPConnection(object):
         if self._proto is None or self._proto.transport.is_closing():
             self._socket, self._proto = await self.loop.create_connection(lambda: LDAPClientProtocol(self.loop), self.server.host, self.server.port)
 
-        if not bind_dn:
+        if bind_dn is None:
             bind_dn = self.bind_dn
-        if not bind_pw:
+        if bind_pw is None:
             bind_pw = self.bind_pw
 
         # If bind_dn is still None or '' then set up for anon bind
