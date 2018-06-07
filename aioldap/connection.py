@@ -65,6 +65,7 @@ class LDAPClientProtocol(asyncio.Protocol):
 
         self.transport = None
         self._original_transport = None
+        self._using_tls = False
         self._tls_event = asyncio.Event(loop=loop)
         self._is_bound = False
 
@@ -100,7 +101,13 @@ class LDAPClientProtocol(asyncio.Protocol):
         if self._original_transport is None:
             self.transport = transport
         else:
+            self._using_tls = True
             self._tls_event.set()
+
+    def eof_received(self):
+        if self._using_tls:
+            return False
+        return super(LDAPClientProtocol, self).eof_received()
 
     def data_received(self, data):
         try:
