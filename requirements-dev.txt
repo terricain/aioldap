@@ -1,5 +1,5 @@
 docker==3.4.0
-pytest==3.6.0
+pytest==3.7.0
 uvloop==0.10.2
 async-timeout==3.0.0
 flake8==3.5.0
