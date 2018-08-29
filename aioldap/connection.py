@@ -286,17 +286,17 @@ class LDAPConnection(object):
             try:
                 if self._proto._original_transport:
                     self._proto._original_transport.close()
-            except:
+            except:  # noqa: E722
                 pass
             try:
                 if self._proto.transport:
                     self._proto.transport.close()
-            except:
+            except:  # noqa: E722
                 pass
         if self._socket:
             try:
                 self._socket.close()
-            except:
+            except:  # noqa: E722
                 pass
 
         self._proto = None
