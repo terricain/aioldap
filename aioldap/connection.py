@@ -278,6 +278,30 @@ class LDAPConnection(object):
         self.bind_dn = user
         self.bind_pw = password
 
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._proto:
+            try:
+                if self._proto._original_transport:
+                    self._proto._original_transport.close()
+            except:
+                pass
+            try:
+                if self._proto.transport:
+                    self._proto.transport.close()
+            except:
+                pass
+        if self._socket:
+            try:
+                self._socket.close()
+            except:
+                pass
+
+        self._proto = None
+        self._socket = None
+
     @property
     def _next_msg_id(self) -> int:
         self._msg_id += 1
