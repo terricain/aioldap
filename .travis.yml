@@ -1,28 +1,23 @@
 language: python
 python:
-  - 3.6
-
+- 3.6
 services:
-  - docker
-
+- docker
 install:
-  - pip install -Ur requirements-dev.txt
-  - pip install .
-  - pip install codecov
-
+- pip install -Ur requirements-dev.txt
+- pip install .
+- pip install codecov
 script:
-  - make cov
-
+- make cov
 deploy:
   provider: pypi
   distributions: sdist bdist_wheel
   user: terrycain
   password:
-    secure: juznZPYamxjEclkmozGZibcMXg6cfaN95MctmMK0ZJ99xqelHfoX1vx6JuY24YlRaMSQBo1bUtQKM2+PVfGHMAfNGrtkPl5NRC1WAkNLRsE4gIrhUULTecEEdldNWIQ3n+ZXE6VslGkRO92NPe65CN+/huNl5iLvGwGMsEmlv5tjidlgnXDBXDT8jiFBtqXs2CMo0/pw+z9tjXbj+LeKa+gnmbPQGbE18ifOiSE7Z8j/nGa38/JMjqjk5PVR13hiRHxnh6VCrG//iOdEFLuxpnnSuZoOiau/SRv4WM5o7ZVSJHuinLZHv9Lk6OgfF6wlDSX6YaZXSdm8QWMoNG+vkb+5eNLRZkr4vTcqddAEa6t34DS8SZQcHTHY0E7qMknTSeHp8JGL8doOHDQL47rH2DYU31M6tiw5XzCmBZndmdFSw52LYh42EU6QHkjiSVFoU7vIcG7bMSZEmu9c3+aPeZIgP38onCbDBDaPWSq8TLTEPdLu9d8lVm4O80ON/YUMkHAHta2C+ZgVKdqELMJOmO5LBRiAt/47oeKC7dtYtNEky8ZScrtkX5hi397rmz6Z0wGR9oz5BwApxFZ4d/IgdXzwqpDiJmHdcuOxaSS2b2C9TQXyGKhXnFIt2MKwiqciSnIU+BjO5xzeNHS6099ZBCOkHgAN/XrRb9Yd/q4T/SA=
+    secure: dxVOfeXROarlWJZ04wpvUGq78Ipr/tjUMz/w8V4WQzTupZULLfZPoLw5CZbLmI3aL3naj+B/BqY/gwdo1DMAnz6YEJfBG42QG/9a57oEGcKQkNcbEacZDyE3bO6LLAMx3rksFuMh3Zi/ofS81IxIXsHt47Gvv9I3jvDUPK8/qlnrog09szXuRjProZ4rfFRZ+bAftZzV2Lvqc81whvY6EkGbftLcQg6Q0wq31Cn1yBPNv9GqUJfw2scgapYw3ydCYMjYrF6Dodp39DwWZ2xUj+Y2h5qqmP6H263okrGD10tN6LcDwuynvnjEPQK/XSd2HFKA5NkYsszO05WKFJLHOqzUkVQNwX5jQe+WhfHZ2UApNSuT3vkNjnijSLk0KLOKmLRVKjBzPpmxQyK/eQnd77i1aBs3GeZeEDrR2c4/GRoul2UyswzY5DmZ+dnPtPFr9/MfreHNVjhF/e64ORE4gR+O1IZtcPPu+/tNUle9gUIQ6vJ4zmnpuJkuOFxeWO+d4AmjiWRvDTUzJdpVSRPz3Ka5uHCRZutNpwvB0MxC0keh1VhBakZNASb66UDPpVqVR9V2EAtrscdy9TX2R9Z4Narap3Gttw7gOrC0mD0xAMxfzdLi/yvWKmZM8HrSsmHDlSF6Ago8t0nIkG1VKpaMo+l7j2M2Zy1On7YJJhXUFYE=
   on:
     python: 3.6
     repo: terrycain/aioldap
     tags: true
-
 after_success:
-  - codecov
+- codecov
