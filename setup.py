@@ -17,7 +17,7 @@ requirements = [
 
 setup(
     name='aioldap',
-    version='0.4.2',
+    version='0.4.3',
     description="Async ldap library sorta based off ldap3",
     long_description=readme + '\n\n' + history,
     author="Terry Cain",
@@ -37,6 +37,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
     test_suite='tests'
 )
