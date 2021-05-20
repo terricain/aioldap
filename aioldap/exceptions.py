@@ -1,5 +1,3 @@
-
-
 class LDAPException(Exception):
     pass
 
@@ -30,3 +28,9 @@ class LDAPAddException(LDAPException):
 
 class LDAPExtendedException(LDAPException):
     pass
+
+
+class OperationNotSupported(Exception):
+    def __init__(self, code):
+        message = f'This LDAP operation with code {code} is not supported'
+        super().__init__(message)
