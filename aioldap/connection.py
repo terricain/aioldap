@@ -42,9 +42,6 @@ class Server(object):
         else:
             self.ssl_ctx = None
 
-    def set_ssl_context(self, ssl_context: Optional[ssl.SSLContext]):
-        self.ssl_ctx = ssl_context
-
 
 class LDAPResponse(object):
     def __init__(self, loop, onfinish=None):
