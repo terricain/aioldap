@@ -44,6 +44,7 @@ Example
 Simple example of using aioboto3 to put items into a dynamodb table
 
 .. code-block:: python
+
     conn = aioldap.LDAPConnection()
     await conn.bind(
         bind_dn=ldap_params['user'],

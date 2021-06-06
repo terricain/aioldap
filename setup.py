@@ -20,6 +20,7 @@ setup(
     version='0.4.3',
     description="Async ldap library sorta based off ldap3",
     long_description=readme + '\n\n' + history,
+    long_description_content_type='text/x-rst',
     author="Terry Cain",
     author_email='terry@terrys-home.co.uk',
     url='https://github.com/terrycain/aioldap',
